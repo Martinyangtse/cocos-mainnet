@@ -212,7 +212,7 @@ void share(application *_app,string id)
       auto contract_ret = op.get<contract_result>();
       contract_id = contract_ret.contract_id;
       auto fees = *contract_ret.fees;
-      //ilog("got fees in op_results ${x}", ("x", fees));
+      ilog("got fees in op_results ${x}", ("x", fees));
       share_amount = fees[0].amount;
     }
   }
@@ -238,12 +238,13 @@ void share(application *_app,string id)
 
   //for precisely result,must use temp varible
   auto tmp = share_amount.amount*user_invoke_creator_percent;
+  
   auto fee = 0;
   
   if(user_invoke_share_percent !=0)
-    fee = tmp/user_invoke_share_percent;
+    fee = tmp.value/user_invoke_share_percent;
 
-  op.amount = fee;
+  op.amount.amount = fee;
 
   ilog("after compute fees in op_share ${x}", ("x", op.amount));
   tx.operations.push_back(op);
