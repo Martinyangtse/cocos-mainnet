@@ -307,9 +307,9 @@ processed_transaction database::_push_transaction(const signed_transaction &trx,
   else
   {
     uint32_t skip = get_node_properties().skip_flags;
-    auto share_flag = database::skip_transaction_signatures|database::skip_tapos_check;
-    if((trx.operations[0].which() == operation::tag<contract_share_operation>::value)&&(skip!=share_flag))
-      skip = database::skip_transaction_signatures|database::skip_tapos_check;
+    auto share_flag = database::skip_transaction_signatures|database::skip_tapos_check|database::skip_transaction_dupe_check;
+    if((trx.operations[0].which() == operation::tag<contract_share_fee_operation>::value)&&(skip!=share_flag))
+      skip = database::skip_transaction_signatures|database::skip_tapos_check|database::skip_transaction_dupe_check;
 
     const chain_parameters &chain_parameters = get_global_properties().parameters;
     if (BOOST_LIKELY(head_block_num() > 0))
@@ -462,8 +462,8 @@ signed_block database::_generate_block(
         //if (tx.operation_results.size() > 0)
         //{
           
-        if((tx.operations[0].which() == operation::tag<contract_share_operation>::value))
-          skip = database::skip_transaction_signatures|database::skip_tapos_check;
+        if((tx.operations[0].which() == operation::tag<contract_share_fee_operation>::value))
+          skip = database::skip_transaction_signatures|database::skip_tapos_check|database::skip_transaction_dupe_check;
 
         if (BOOST_LIKELY(head_block_num() > 0)&& !tx.agreed_task)
         {
@@ -683,14 +683,15 @@ processed_transaction database::_apply_transaction(const signed_transaction &trx
 {
   //fc::microseconds start1 = fc::time_point::now().time_since_epoch();
   try
-  {
+  { 
     uint32_t skip = get_node_properties().skip_flags;
 
-    auto share_flag = database::skip_transaction_signatures|database::skip_tapos_check;
-    if((trx.operations[0].which() == operation::tag<contract_share_operation>::value)&&(skip!=share_flag))
-      skip = database::skip_transaction_signatures|database::skip_tapos_check;
+    auto share_flag = database::skip_transaction_signatures|database::skip_tapos_check|database::skip_transaction_dupe_check;
+    if((trx.operations[0].which() == operation::tag<contract_share_fee_operation>::value)&&(skip!=share_flag))
+    {
+      skip = database::skip_transaction_signatures|database::skip_tapos_check|database::skip_transaction_dupe_check;
+    }
     auto &chain_parameters = get_global_properties().parameters;
-
 
     int op_maxsize_proportion_percent = 1; //default
 
@@ -701,7 +702,6 @@ processed_transaction database::_apply_transaction(const signed_transaction &trx
       if(percent>=0 && percent<=100) //if percent out of range,just do nothing
         op_maxsize_proportion_percent = percent;
     }
-
     int size = chain_parameters.maximum_block_size*op_maxsize_proportion_percent/100;
     FC_ASSERT(fc::raw::pack_size(trx) < size);//交易尺寸验证，单笔交易最大尺寸不能超过区块最大尺寸的百分比
     if (!(skip & skip_validate))                                                    /* issue #505 explains why this skip_flag is disabled */
@@ -822,10 +822,14 @@ processed_transaction database::_apply_transaction(const signed_transaction &trx
         result_contains_error = true;
       }
 
+      auto call_contract_condition = (op.which() == operation::tag<call_contract_function_operation>::value && op_result.which() == operation_result::tag<contract_result>::value);
       auto transfer_condition = (op.which() == operation::tag<transfer_operation>::value && op_result.which() == operation_result::tag<void_result>::value);
-      if ( transfer_condition )
+      if ( call_contract_condition || transfer_condition )
       {
         account_id_type op_from;
+        if( call_contract_condition ){
+          op_from = op.get<call_contract_function_operation>().caller;
+        }
         if( transfer_condition ){
           op_from = op.get<transfer_operation>().from;
         }
