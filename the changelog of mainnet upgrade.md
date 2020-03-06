@@ -1,4 +1,4 @@
-# 2019/12/24upgrade to v1.0.9
+# 2019/12/24 upgrade to v1.0.9
 ## solve bugs：
 1.display of small negative position.
 
